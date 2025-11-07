@@ -1,5 +1,10 @@
 import * as ed from "@noble/ed25519";
 import bs58 from "bs58";
+// Dependency for the Mnemonic
+import * as bip39 from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english.js";
+
+import { Keypair } from "@solana/web3.js";
 
 function toHexString(arr: number[]) {
   const byteArray: string[] = [];
@@ -51,4 +56,36 @@ const verifyMessage = async (
   return isValid;
 };
 
-export { createKey, signMessage, verifyMessage };
+const createMnemonic = () => {
+  const mn = bip39.generateMnemonic(wordlist);
+  return mn;
+};
+
+const createByteMnemonic = (mn: string) => {
+  const ent = bip39.mnemonicToEntropy(mn, wordlist);
+  return ent;
+};
+
+const createSeed = async (mn: string) => {
+  const seed = await bip39.mnemonicToSeedWebcrypto(mn, "password");
+  console.log("🚀 ----------------------------🚀");
+  console.log("🚀 ~ createSeed ~ seed:", seed);
+  console.log("🚀 ----------------------------🚀");
+  return seed;
+};
+
+const createKeyPairSolana = (seed: Uint8Array) => {
+  const key = Keypair.fromSeed(seed.slice(32));
+
+  return key;
+};
+
+export {
+  createKey,
+  signMessage,
+  verifyMessage,
+  createMnemonic,
+  createByteMnemonic,
+  createSeed,
+  createKeyPairSolana,
+};

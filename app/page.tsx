@@ -1,7 +1,14 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { createKey, signMessage, verifyMessage } from "@/lib/createKey";
-import { useState } from "react";
+import {
+  createKey,
+  createKeyPairSolana,
+  createMnemonic,
+  createSeed,
+  signMessage,
+  verifyMessage,
+} from "@/lib/createKey";
+import { useEffect, useState } from "react";
 import {
   Popover,
   PopoverContent,
@@ -16,7 +23,9 @@ import {
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Copy, Key, MessageSquare, CheckCircle } from "lucide-react"; // Assuming lucide-react is installed for icons
-
+import * as bip39 from "@scure/bip39";
+import { wordlist } from "@scure/bip39/wordlists/english.js";
+import { Bytes } from "@noble/ed25519";
 interface keys {
   privateKey: string;
   publicKey: string;
@@ -30,6 +39,14 @@ export default function Home() {
   const [userSign, setSign] = useState<string>("");
   const [verifySign, setVerifySign] = useState<boolean>();
 
+  const [mnemonicText, setMnemonicText] = useState<string[]>();
+
+  const [seed, setSeed] = useState<Uint8Array | undefined>(undefined);
+  // useEffect(() => {
+  //   console.log("mnemonicToEntropys", mn);
+  //   setMnemonicText(mn);
+  // }, []);
+
   return (
     <div className="bg-gradient-to-br from-slate-900 to-slate-800 flex justify-center items-center w-full min-h-screen p-6">
       <div className="flex flex-col justify-between gap-6 items-center w-full max-w-4xl bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl p-8 border border-slate-700/50">
@@ -37,6 +54,25 @@ export default function Home() {
           <h1 className="text-4xl font-bold text-white mb-4 md:mb-0">
             Create Your Wallet
           </h1>
+          <Button
+            className="whitespace-nowrap bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+            onClick={async () => {
+              const mn = createMnemonic();
+              console.log(mn.split(" "));
+              setMnemonicText(mn.split(" "));
+
+              const seed = await createSeed(mn);
+              setSeed(seed);
+
+              const keys = createKeyPairSolana(seed);
+              console.log("🚀 ----------------------🚀");
+              console.log("🚀 ~ Home ~ keys:", keys);
+              console.log("🚀 ----------------------🚀");
+            }}>
+            {/* <Text className="w-4 h-4 mr-2" /> */}
+            Generate Phrase
+          </Button>
+
           <Button
             className="whitespace-nowrap bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
             onClick={async () => {
@@ -49,6 +85,19 @@ export default function Home() {
             Create Wallet
           </Button>
         </div>
+        {mnemonicText && (
+          <div className="bg-slate-800 p-4 rounded-lg border border-slate-600 w-full mx-auto">
+            <div className="grid grid-cols-3 gap-3">
+              {mnemonicText?.map((word, i) => (
+                <div
+                  key={i}
+                  className="bg-slate-700 text-slate-200 text-center rounded-md py-2 px-3 text-sm font-mono select-text shadow-sm">
+                  {word}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {/* Show the keys */}
         <div className="bg-slate-800/50 w-full rounded-lg p-6 max-h-96 overflow-y-auto shadow-inner border border-slate-600">
           {objKeys.length === 0 && (
