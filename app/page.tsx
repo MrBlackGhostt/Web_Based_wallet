@@ -23,30 +23,30 @@ import {
 } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Copy, Key, MessageSquare, CheckCircle } from "lucide-react"; // Assuming lucide-react is installed for icons
-import * as bip39 from "@scure/bip39";
-import { wordlist } from "@scure/bip39/wordlists/english.js";
-import { Bytes } from "@noble/ed25519";
+
+import { derivePath } from "ed25519-hd-key";
+import { Keypair } from "@solana/web3.js";
+import nacl from "tweetnacl";
+import { PublicKey } from "@solana/web3.js";
+import { createAccount } from "@/lib/createAccount";
+
 interface keys {
-  privateKey: string;
+  secretKey: string;
   publicKey: string;
 }
 
 export default function Home() {
   const [objKeys, setObjKeys] = useState<keys[]>([]);
-  const [usePublicKey, setPublicKey] = useState("");
-  const [usePrivateKey, setPrivateKey] = useState("");
+
+  const [publicKeys, setPublicKeys] = useState<PublicKey[]>([]);
   const [userMessage, setMessage] = useState<string>("");
   const [userSign, setSign] = useState<string>("");
   const [verifySign, setVerifySign] = useState<boolean>();
 
   const [mnemonicText, setMnemonicText] = useState<string[]>();
 
-  const [seed, setSeed] = useState<Uint8Array | undefined>(undefined);
-  // useEffect(() => {
-  //   console.log("mnemonicToEntropys", mn);
-  //   setMnemonicText(mn);
-  // }, []);
-
+  const [seed, setSeed] = useState<Uint8Array>();
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
   return (
     <div className="bg-gradient-to-br from-slate-900 to-slate-800 flex justify-center items-center w-full min-h-screen p-6">
       <div className="flex flex-col justify-between gap-6 items-center w-full max-w-4xl bg-white/10 backdrop-blur-lg rounded-xl shadow-2xl p-8 border border-slate-700/50">
@@ -76,15 +76,27 @@ export default function Home() {
           <Button
             className="whitespace-nowrap bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
             onClick={async () => {
-              const { privateKey, publicKey } = await createKey();
-              setPublicKey(publicKey);
-              setPrivateKey(privateKey);
-              setObjKeys((prev) => [...prev, { privateKey, publicKey }]);
-            }}>
+              const path = `m/44'/501'/${currentIndex}'/0'`;
+              if (seed) {
+                const derivedSeed = derivePath(path, seed?.toString("hex")).key; // What this aderivedPath do
+                const secret =
+                  nacl.sign.keyPair.fromSeed(derivedSeed).secretKey;
+                const keypair = Keypair.fromSecretKey(secret);
+
+                console.log("KEyPAIR", keypair);
+
+                setPublicKeys([...publicKeys, keypair.publicKey]);
+                setCurrentIndex(currentIndex + 1);
+                // setObjKeys((prev) => [...prev, { keypair.privateKey, publicKey }]);
+              }
+            }}
+            disabled={mnemonicText ? false : true}>
             <Key className="w-4 h-4 mr-2" />
             Create Wallet
           </Button>
+          {/* <Button onClick={() => createAccount()}>Send Transaction</Button> */}
         </div>
+
         {mnemonicText && (
           <div className="bg-slate-800 p-4 rounded-lg border border-slate-600 w-full mx-auto">
             <div className="grid grid-cols-3 gap-3">
@@ -100,14 +112,14 @@ export default function Home() {
         )}
         {/* Show the keys */}
         <div className="bg-slate-800/50 w-full rounded-lg p-6 max-h-96 overflow-y-auto shadow-inner border border-slate-600">
-          {objKeys.length === 0 && (
+          {publicKeys.length === 0 && (
             <p className="text-slate-300 text-center italic">
               No wallets created yet. Click `Create Wallet` to generate your
               first one.
             </p>
           )}
           <div className="space-y-4">
-            {objKeys.map((key: keys, i: number) => (
+            {publicKeys.map((key, i: number) => (
               <Card
                 className="bg-slate-700/80 border-slate-600 hover:bg-slate-700 transition-colors"
                 key={i}>
@@ -121,7 +133,7 @@ export default function Home() {
                         Wallet {i + 1}
                       </h3>
                       <p className="text-sm text-slate-400 truncate max-w-xs">
-                        {key.publicKey}
+                        {key.toBase58()}
                       </p>
                     </div>
                   </div>
@@ -130,7 +142,16 @@ export default function Home() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="border-slate-500 text-slate-300 hover:bg-slate-600">
+                        className="border-slate-500 text-slate-300 hover:bg-slate-600"
+                        onClick={async () => {
+                          const response = await fetch("/api/token", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ key: key.toBase58() }),
+                          });
+                          const data = await response.json();
+                          console.log("Response from API:", data);
+                        }}>
                         <MessageSquare className="w-4 h-4 mr-1" />
                         Details
                       </Button>
@@ -161,7 +182,7 @@ export default function Home() {
                               rows={3}
                             />
                           </div>
-                          <Button
+                          {/* <Button
                             className="w-full bg-green-600 hover:bg-green-700"
                             onClick={async () => {
                               const sign = await signMessage(
@@ -173,7 +194,7 @@ export default function Home() {
                             }}>
                             <CheckCircle className="w-4 h-4 mr-2" />
                             Sign Message
-                          </Button>
+                          </Button> */}
                           {userSign && (
                             <div className="space-y-2">
                               <label className="text-sm font-medium text-slate-300">
@@ -193,7 +214,7 @@ export default function Home() {
                               const sign = await verifyMessage(
                                 userSign,
                                 userMessage,
-                                key.publicKey
+                                key.toBase58()
                               );
                               console.log(sign);
                               setVerifySign(sign);
@@ -210,7 +231,7 @@ export default function Home() {
                     variant="ghost"
                     className="text-slate-300 hover:text-white"
                     onClick={() =>
-                      navigator.clipboard.writeText(key.publicKey)
+                      navigator.clipboard.writeText(key.toBase58())
                     }>
                     <Copy className="w-4 h-4" />
                   </Button>

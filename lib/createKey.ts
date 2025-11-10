@@ -20,17 +20,6 @@ async function createKey() {
 
   // Convert the message "hello world" to a Uint8Array
   const message = new TextEncoder().encode("hello world");
-
-  // Generate the public key from the private key
-  //   const pubKey = await ed.getPublicKeyAsync(privKey);
-
-  // Sign the message
-
-  // Verify the signature
-  //   const isValid = await ed.verifyAsync(signature, message, publicKey);
-
-  // Output the result
-  //   console.log(isValid); // Should print `true` if the signature is valid
   return {
     privateKey: bs58.encode(secretKey),
     publicKey: bs58.encode(publicKey),
